@@ -1,3 +1,4 @@
+
 name: Build Saydalati APK
 
 on:
@@ -18,38 +19,104 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
+      - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
 
-      - name: Setup Java
+      - name: Set up Java
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: 21
+          java-version: "21"
 
-    
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
       - name: Install dependencies
         run: npm install
 
-      - name: Build web files
+      - name: Build web application
         run: npm run build
 
-      - name: Add Android platform
-        run: npx cap add android
+      - name: Create Android project if missing
+        run: |
+          if [ ! -d android ]; then
+            npx cap add android
+          fi
 
-      - name: Sync Android
+      - name: Sync Capacitor
         run: npx cap sync android
+
+      - name: Configure AdMob App ID
+        env:
+          ADMOB_APP_ID: ca-app-pub-8977777779084791~7615099195
+        run: |
+          python3 - <<'PY'
+          import os
+          import re
+          from pathlib import Path
+
+          manifest = Path(
+              "android/app/src/main/AndroidManifest.xml"
+          )
+          if not manifest.exists():
+              raise SystemExit("AndroidManifest.xml not found")
+
+          content = manifest.read_text()
+
+          metadata = '''
+                  <meta-data
+                      android:name="com.google.android.gms.ads.APPLICATION_ID"
+                      android:value="@string/admob_app_id" />
+          '''
+
+          if "com.google.android.gms.ads.APPLICATION_ID" not in content:
+              content, count = re.subn(
+                  r'<application\b',
+                  lambda m: m.group(0) + metadata,
+                  content,
+                  count=1
+              )
+              if count != 1:
+                  raise SystemExit("Could not update AndroidManifest.xml")
+
+          manifest.write_text(content)
+
+          values = Path("android/app/src/main/res/values")
+          values.mkdir(parents=True, exist_ok=True)
+          strings = values / "strings.xml"
+
+          if strings.exists():
+              s = strings.read_text()
+              if "admob_app_id" not in s:
+                  s = s.replace(
+                      "</resources>",
+                      '    <string name="admob_app_id">'
+                      + os.environ["ADMOB_APP_ID"]
+                      + "</string>\n</resources>"
+                  )
+                  strings.write_text(s)
+          else:
+              strings.write_text(
+                  '<?xml version="1.0" encoding="utf-8"?>\n'
+                  '<resources>\n'
+                  '    <string name="admob_app_id">'
+                  + os.environ["ADMOB_APP_ID"]
+                  + '</string>\n'
+                  '</resources>\n'
+              )
+          PY
 
       - name: Build APK
         run: |
-          chmod +x android/gradlew
           cd android
+          chmod +x gradlew
           ./gradlew assembleDebug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: saydalati-apk
-          path: android/app/build/outputs/apk/debug/app-debug.apk
+          name: Saydalati-APK
+          path: android/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
