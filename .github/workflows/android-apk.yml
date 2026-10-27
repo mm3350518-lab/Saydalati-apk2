@@ -30,7 +30,7 @@ jobs:
           distribution: temurin
           java-version: "21"
 
-            - name: Set up Android SDK
+      - name: Set up Android SDK
         uses: android-actions/setup-android@v3
         with:
           packages: |
@@ -40,6 +40,11 @@ jobs:
 
       - name: Install dependencies
         run: npm install
+
+      - name: Check Capacitor
+        run: |
+          npm ls @capacitor/core
+          npm ls @capacitor/cli
 
       - name: Build web application
         run: npm run build
@@ -61,22 +66,24 @@ jobs:
           import os
           import re
           from pathlib import Path
+          import xml.etree.ElementTree as ET
 
           manifest = Path(
               "android/app/src/main/AndroidManifest.xml"
           )
+
           if not manifest.exists():
               raise SystemExit("AndroidManifest.xml not found")
 
           content = manifest.read_text()
+          app_id = os.environ["ADMOB_APP_ID"]
 
-          metadata = '''
+          if "com.google.android.gms.ads.APPLICATION_ID" not in content:
+              metadata = '''
                   <meta-data
                       android:name="com.google.android.gms.ads.APPLICATION_ID"
                       android:value="@string/admob_app_id" />
-          '''
-
-          if "com.google.android.gms.ads.APPLICATION_ID" not in content:
+              '''
               content, count = re.subn(
                   r'<application\b',
                   lambda m: m.group(0) + metadata,
@@ -84,7 +91,7 @@ jobs:
                   count=1
               )
               if count != 1:
-                  raise SystemExit("Could not update AndroidManifest.xml")
+                  raise SystemExit("Could not update manifest")
 
           manifest.write_text(content)
 
@@ -93,24 +100,25 @@ jobs:
           strings = values / "strings.xml"
 
           if strings.exists():
-              s = strings.read_text()
-              if "admob_app_id" not in s:
-                  s = s.replace(
-                      "</resources>",
-                      '    <string name="admob_app_id">'
-                      + os.environ["ADMOB_APP_ID"]
-                      + "</string>\n</resources>"
-                  )
-                  strings.write_text(s)
+              tree = ET.parse(strings)
+              root = tree.getroot()
           else:
-              strings.write_text(
-                  '<?xml version="1.0" encoding="utf-8"?>\n'
-                  '<resources>\n'
-                  '    <string name="admob_app_id">'
-                  + os.environ["ADMOB_APP_ID"]
-                  + '</string>\n'
-                  '</resources>\n'
+              root = ET.Element("resources")
+              tree = ET.ElementTree(root)
+
+          item = root.find("string[@name='admob_app_id']")
+
+          if item is None:
+              item = ET.SubElement(
+                  root, "string", {"name": "admob_app_id"}
               )
+
+          item.text = app_id
+          tree.write(
+              strings,
+              encoding="utf-8",
+              xml_declaration=True
+          )
           PY
 
       - name: Build APK
