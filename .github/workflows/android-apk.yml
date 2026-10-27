@@ -30,7 +30,7 @@ jobs:
           distribution: temurin
           java-version: "21"
 
-            - name: Set up Android SDK
+      - name: Set up Android SDK
         uses: android-actions/setup-android@v3
         with:
           packages: |
@@ -38,13 +38,27 @@ jobs:
             platforms;android-35
             build-tools;35.0.0
 
+      - name: Check project files
+        run: |
+          test -f package.json
+          test -f index.html
+
       - name: Install dependencies
         run: npm install
 
-      - name: Check Capacitor
+      - name: Prepare Capacitor configuration
         run: |
-          npm ls @capacitor/core
-          npm ls @capacitor/cli
+          if [ ! -f capacitor.config.json ] && \
+             [ ! -f capacitor.config.ts ] && \
+             [ ! -f capacitor.config.js ]; then
+            cat > capacitor.config.json <<'EOF'
+          {
+            "appId": "com.saydalati.app",
+            "appName": "صيدليتي",
+            "webDir": "www"
+          }
+          EOF
+          fi
 
       - name: Build web application
         run: npm run build
@@ -64,9 +78,13 @@ jobs:
         run: |
           python3 - <<'PY'
           import os
-          import re
-          from pathlib import Path
           import xml.etree.ElementTree as ET
+          from pathlib import Path
+
+          android_ns = "http://schemas.android.com/apk/res/android"
+          ET.register_namespace("android", android_ns)
+          attr_name = f"{{{android_ns}}}name"
+          attr_value = f"{{{android_ns}}}value"
 
           manifest = Path(
               "android/app/src/main/AndroidManifest.xml"
@@ -75,50 +93,36 @@ jobs:
           if not manifest.exists():
               raise SystemExit("AndroidManifest.xml not found")
 
-          content = manifest.read_text()
+          tree = ET.parse(manifest)
+          root = tree.getroot()
+          app = root.find("application")
+
+          if app is None:
+              raise SystemExit("application tag not found")
+
           app_id = os.environ["ADMOB_APP_ID"]
+          metadata = None
 
-          if "com.google.android.gms.ads.APPLICATION_ID" not in content:
-              metadata = '''
-                  <meta-data
-                      android:name="com.google.android.gms.ads.APPLICATION_ID"
-                      android:value="@string/admob_app_id" />
-              '''
-              content, count = re.subn(
-                  r'<application\b',
-                  lambda m: m.group(0) + metadata,
-                  content,
-                  count=1
-              )
-              if count != 1:
-                  raise SystemExit("Could not update manifest")
+          for item in app.findall("meta-data"):
+              if item.get(attr_name) == \
+                  "com.google.android.gms.ads.APPLICATION_ID":
+                  metadata = item
+                  break
 
-          manifest.write_text(content)
-
-          values = Path("android/app/src/main/res/values")
-          values.mkdir(parents=True, exist_ok=True)
-          strings = values / "strings.xml"
-
-          if strings.exists():
-              tree = ET.parse(strings)
-              root = tree.getroot()
-          else:
-              root = ET.Element("resources")
-              tree = ET.ElementTree(root)
-
-          item = root.find("string[@name='admob_app_id']")
-
-          if item is None:
-              item = ET.SubElement(
-                  root, "string", {"name": "admob_app_id"}
+          if metadata is None:
+              metadata = ET.SubElement(app, "meta-data")
+              metadata.set(
+                  attr_name,
+                  "com.google.android.gms.ads.APPLICATION_ID"
               )
 
-          item.text = app_id
+          metadata.set(attr_value, app_id)
           tree.write(
-              strings,
+              manifest,
               encoding="utf-8",
               xml_declaration=True
           )
+          print("AdMob App ID configured successfully.")
           PY
 
       - name: Build APK
