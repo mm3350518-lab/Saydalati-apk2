@@ -1,3 +1,4 @@
+
 {
   "name": "saydalati-pharmacy-game",
   "version": "1.0.0",
@@ -11,7 +12,8 @@
   },
   "dependencies": {
     "@capacitor/core": "^7.4.0",
-    "@capacitor/android": "^7.4.0"
+    "@capacitor/android": "^7.4.0",
+    "@capacitor-community/admob": "^7.0.0"
   },
   "devDependencies": {
     "@capacitor/cli": "^7.4.0"
