@@ -178,12 +178,9 @@ h+="</div><div class='card'><h3>تطوير الصيدلية</h3><p class='mu'>ا
 else{var pc=Math.min(100,L==3?100:L==2?(S.xp-40)/80*100:S.xp/40*100);h="<div class='card'><h3>تقدمك</h3><div class='bar'><i style='width:"+pc+"%'></i></div><p class='mu'>خبرة "+S.xp+(L<3?" · المستوى التالي عند "+(L==1?40:120):" · أقصى مستوى (حالات متقدمة)")+"</p><div class='r'><span>القرارات الممتازة</span><b>"+S.ok+" / "+S.all+"</b></div><div class='r'><span>الدخل</span><b>"+S.rev+"</b></div><div class='r'><span>المصروفات</span><b>"+S.sp+"</b></div><div class='r'><span>صافي الربح</span><b class='"+(S.rev-S.sp<0?"red":"")+"'>"+(S.rev-S.sp)+"</b></div><div class='r'><span>مستوى تطوير الصيدلية</span><b>"+S.up+"</b></div><p class='mu'>المستوى 2 يفتح حالات الأطفال والحساسية، والمستوى 3 يفتح التداخلات والحمل والأمراض المزمنة وعلامات الخطر.</p><button class='btn g' onclick='if(confirm(\"إعادة اللعبة؟\"))reset()'>إعادة اللعبة</button></div>"}
 document.getElementById("app").innerHTML=h;saveGame();applyUiLanguage()}
 function flt(v){v=v.trim().toLowerCase();document.querySelectorAll(".dr").forEach(function(e){e.style.display=e.textContent.toLowerCase().indexOf(v)>-1?"":"none"})}
+
 loadGame();render();
 </script>
-</body>
-
 <script src="admob.bundle.js"></script>
 </body>
-</html>
-
 </html>
